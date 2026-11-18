@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e1726">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="OBD Remote">
+<title>OBD Remote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e1726; --panel: #17243a; --panel-2: #1d2d48; --line: #2b3c59;
+  --text: #e9eef6; --muted: #94a4bd; --amber: #ffb020; --amber-ink: #2a1c00;
+  --good: #58d6b8; --bad: #ff7a6b; --focus: #8ab8ff;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --dial: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #eef1f6; --panel: #ffffff; --panel-2: #f5f7fb; --line: #d3dae6;
+    --text: #152033; --muted: #5b6b85; --amber: #c97a00; --amber-ink: #ffffff;
+    --good: #0f8f73; --bad: #c8402f; --focus: #1f5fd0;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.45 var(--body); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.wrap { max-width: 640px; margin: 0 auto; padding: 12px 16px 40px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0 14px; }
+.top h1 { margin: 0; font: 600 20px/1.2 var(--dial); letter-spacing: .01em; }
+.top .car { color: var(--muted); font-weight: 400; margin-left: 8px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 9px 14px; cursor: pointer; min-height: 42px; }
+.btn:hover { background: var(--panel-2); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.btn.quiet { background: none; }
+.btn[disabled] { opacity: .5; cursor: default; }
+
+.demo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; color: var(--muted); }
+.demo strong { color: var(--text); font-weight: 600; }
+.demo .btn { min-height: 36px; padding: 6px 12px; }
+
+/* The telltale: the one loud element. Amber only ever means the check-engine light. */
+.tell { display: grid; grid-template-columns: 84px 1fr; gap: 16px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+.lamp { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.lamp svg { width: 50px; height: 50px; }
+.tell.on .lamp { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); box-shadow: 0 0 0 6px color-mix(in srgb, var(--amber) 22%, transparent); }
+.tell.clear .lamp { color: var(--good); }
+.tell h2 { margin: 0 0 4px; font: 600 26px/1.15 var(--dial); }
+.tell p { margin: 0; color: var(--muted); }
+.link { margin: 12px 2px 0; display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.live { background: var(--good); }
+.dot.err { background: var(--bad); }
+@media (prefers-reduced-motion: no-preference) { .dot.tick { animation: tick .6s ease-out; } }
+@keyframes tick { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 70%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+
+section { margin-top: 22px; }
+section > h3 { margin: 0 0 10px; font: 600 17px/1.2 var(--dial); display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+section > h3 small { font: 400 14px var(--body); color: var(--muted); }
+
+.codes { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+.codes li { display: grid; grid-template-columns: 78px 1fr; gap: 4px 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.codes li:first-child { border-top: 0; }
+.codes .code { font: 600 20px/1.2 var(--dial); }
+.codes .kind { grid-column: 1; color: var(--muted); font-size: 13px; }
+.codes .desc { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.codes .desc a { color: inherit; font-size: 14px; opacity: .8; display: inline-block; white-space: nowrap; }
+.note { color: var(--muted); font-size: 14px; margin: 10px 2px 0; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 560px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 10px; min-width: 0; }
+.tile .name { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .val { font: 600 34px/1.1 var(--dial); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .val span { font: 500 15px var(--body); color: var(--muted); margin-left: 4px; }
+.tile .age { color: var(--muted); font-size: 13px; min-height: 18px; }
+.tile svg { display: block; width: 100%; height: 26px; margin-top: 4px; }
+.tile svg polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.tile.stale .val { opacity: .55; }
+.tile.warn .val { color: var(--bad); }
+
+details { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+summary { padding: 12px 14px; cursor: pointer; font-weight: 500; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+td { padding: 8px 14px; border-top: 1px solid var(--line); vertical-align: baseline; }
+td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td:nth-child(3) { text-align: right; color: var(--muted); white-space: nowrap; width: 1%; }
+.events { list-style: none; margin: 0; padding: 0; }
+.events li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-top: 1px solid var(--line); }
+.events li:first-child { border-top: 0; }
+.events time { color: var(--muted); white-space: nowrap; }
+a { color: var(--focus); }
+
+.setup { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; }
+.setup h2 { margin: 0 0 6px; font: 600 26px/1.15 var(--dial); }
+.setup > p { margin: 0 0 16px; color: var(--muted); }
+label { display: block; margin: 14px 0 0; font-weight: 500; }
+label small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+input, select { width: 100%; margin-top: 6px; padding: 11px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.err { color: var(--bad); margin: 12px 0 0; }
+footer { margin-top: 30px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>OBD Remote<span class="car" id="carName"></span></h1>
+    <button class="btn" id="btnSettings" hidden>Settings</button>
+  </header>
+
+  <!-- First run and settings -->
+  <form class="setup" id="setup" hidden autocomplete="off">
+    <h2 id="setupTitle">Connect to your car</h2>
+    <p id="setupLead">Enter the details of your message service once. They stay on this device only.</p>
+    <label>Car name<input id="fName" placeholder="My car" maxlength="24"></label>
+    <label>Message service address
+      <small>The address EMQX shows on your deployment page, without a port.</small>
+      <input id="fHost" placeholder="abc123.ala.us-east-1.emqxsl.com" inputmode="url" autocapitalize="none" spellcheck="false" required></label>
+    <div class="two">
+      <label>User name<input id="fUser" autocapitalize="none" spellcheck="false"></label>
+      <label>Password<input id="fPass" type="password"></label>
+    </div>
+    <label>Car topic
+      <small>The CAR_TOPIC from the adapter's config file, for example obd/mycar.</small>
+      <input id="fDev" placeholder="obd/mycar" autocapitalize="none" spellcheck="false" required></label>
+    <div class="two">
+      <label>Units<select id="fUnits"><option value="us">Miles and °F</option><option value="metric">Kilometres and °C</option></select></label>
+      <label>Port and path<input id="fPort" placeholder="8084/mqtt" autocapitalize="none" spellcheck="false"></label>
+    </div>
+    <p class="err" id="setupErr" hidden></p>
+    <div class="row">
+      <button class="btn primary" type="submit">Save and connect</button>
+      <button class="btn" type="button" id="btnDemo">Try the demo</button>
+      <button class="btn quiet" type="button" id="btnCancel" hidden>Cancel</button>
+    </div>
+    <div class="row" id="setupExtra" hidden>
+      <button class="btn" type="button" id="btnTest">Send a test reading</button>
+      <button class="btn" type="button" id="btnForget">Forget this connection</button>
+    </div>
+    <p class="note" id="testNote" hidden></p>
+  </form>
+
+  <main id="dash" hidden>
+    <div class="demo" id="demoBar" hidden>
+      <span><strong>Demo data.</strong> Nothing here comes from a real car.</span>
+      <button class="btn" id="demoFault">Simulate a fault</button>
+      <button class="btn" id="demoPark">Park the car</button>
+      <button class="btn" id="demoExit">Leave the demo</button>
+    </div>
+
+    <div class="tell" id="tell" role="status">
+      <div class="lamp" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M17 13h12M23 13v5M14 18h17l4 5h4v-4h4v18h-4v-4h-4l-5 5H18l-4-4H9V23h5z"/><path d="M9 28H4M4 23v10"/>
+        </svg>
+      </div>
+      <div><h2 id="tellHead">Waiting for the first reading</h2><p id="tellSub"></p></div>
+    </div>
+    <div class="link"><span class="dot" id="dot"></span><span id="linkText">Connecting</span></div>
+
+    <section id="secCodes" hidden>
+      <h3>Trouble codes <small id="codesAge"></small></h3>
+      <ul class="codes" id="codeList"></ul>
+      <p class="note" id="codesNote"></p>
+    </section>
+    <div class="row">
+      <button class="btn" id="btnCheck">Check now</button>
+      <span class="note" id="checkNote" style="margin:0">Asks the adapter for battery voltage and a fresh code scan.</span>
+    </div>
+
+    <section id="secTiles" hidden>
+      <h3>Readings <small id="tilesAge"></small></h3>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section id="secWhere" hidden>
+      <h3>Location <small id="whereAge"></small></h3>
+      <p style="margin:0"><a id="whereLink" href="#" target="_blank" rel="noopener">Open the last position in Maps</a></p>
+    </section>
+
+    <section id="secAll" hidden>
+      <details><summary id="allSum">All readings</summary><table><tbody id="allBody"></tbody></table></details>
+    </section>
+
+    <section id="secEvents" hidden>
+      <h3>Recent events</h3>
+      <ul class="events" id="eventList"></ul>
+    </section>
+  </main>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const now = () => Date.now();
+
+/* ---------- storage: this device only, never required ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+
+/* ---------- what the adapter's parameter names mean ---------- */
+// kind: speed km/h, temp degC, dist km, press kPa, alt m. Converted for US units.
+const P = {
+  ControlModuleVolt: ['Battery', 'V', '', 1], EngineRPM: ['Engine speed', 'rpm', '', 0],
+  VehicleSpeed: ['Speed', 'km/h', 'speed', 0], EngineCoolantTemp: ['Coolant', '°C', 'temp', 0],
+  FuelTankLevel: ['Fuel level', '%', '', 0], CalcEngineLoad: ['Engine load', '%', '', 0],
+  IntakeAirTemperature: ['Intake air', '°C', 'temp', 0], ThrottlePosition: ['Throttle', '%', '', 0],
+  EngineOilTemp: ['Oil temperature', '°C', 'temp', 0], AmbientAirTemp: ['Outside air', '°C', 'temp', 0],
+  Odometer: ['Odometer', 'km', 'dist', 0], DistanceMILOn: ['Driven with light on', 'km', 'dist', 0],
+  DistanceSinceCodeClear: ['Driven since codes cleared', 'km', 'dist', 0],
+  TimeRunMILOn: ['Run time with light on', 'min', '', 0], TimeSinceCodeClear: ['Time since codes cleared', 'min', '', 0],
+  WarmUpsSinceCodeClear: ['Warm-ups since codes cleared', '', '', 0],
+  TimeSinceEngStart: ['Engine running for', 's', '', 0], EngineRunTime: ['Engine run time', 's', '', 0],
+  IntakeManiAbsPress: ['Manifold pressure', 'kPa', 'press', 0], AbsBaroPres: ['Barometric pressure', 'kPa', 'press', 0],
+  FuelPressure: ['Fuel pressure', 'kPa', 'press', 0], MAFAirFlowRate: ['Air flow', 'g/s', '', 1],
+  TimingAdvance: ['Timing advance', '°', '', 1], EngineFuelRate: ['Fuel rate', 'L/h', '', 1],
+  ShortFuelTrimBank1: ['Short fuel trim, bank 1', '%', '', 1], LongFuelTrimBank1: ['Long fuel trim, bank 1', '%', '', 1],
+  ShortFuelTrimBank2: ['Short fuel trim, bank 2', '%', '', 1], LongFuelTrimBank2: ['Long fuel trim, bank 2', '%', '', 1],
+  CatTempBank1Sens1: ['Catalyst temperature', '°C', 'temp', 0], AbsLoadValue: ['Absolute load', '%', '', 0],
+  RelThrottlePos: ['Relative throttle', '%', '', 0], EthanolFuelPct: ['Ethanol in fuel', '%', '', 0],
+  gps_speed: ['GPS speed', 'km/h', 'speed', 0], gps_altitude: ['Altitude', 'm', 'alt', 0],
+  gps_satellites: ['GPS satellites', '', '', 0], gps_heading: ['Heading', '°', '', 0]
+};
+const TILES = ['ControlModuleVolt', 'VehicleSpeed', 'EngineRPM', 'EngineCoolantTemp', 'FuelTankLevel', 'CalcEngineLoad', 'EngineOilTemp', 'AmbientAirTemp', 'Odometer'];
+const HIDE = /^(timestamp|ts|test|MonitorStatus|FreezeDTC|gps_latitude|gps_longitude|PIDsSupported.*|battery_voltage)$/;
+
+function label(k) { return P[k] ? P[k][0] : k.replace(/_/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2'); }
+function show(k, v) {
+  const m = P[k] || [k, '', '', 2]; let unit = m[1], x = v;
+  if (cfg && cfg.units === 'us') {
+    if (m[2] === 'speed') { x = v * 0.621371; unit = 'mph'; }
+    else if (m[2] === 'temp') { x = v * 9 / 5 + 32; unit = '°F'; }
+    else if (m[2] === 'dist') { x = v * 0.621371; unit = 'mi'; }
+    else if (m[2] === 'press') { x = v * 0.145038; unit = 'psi'; }
+    else if (m[2] === 'alt') { x = v * 3.28084; unit = 'ft'; }
+  }
+  const d = m[3], txt = Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en-US') : x.toFixed(Number.isInteger(x) && !P[k] ? 0 : d);
+  return [txt, unit];
+}
+function ago(t) {
+  if (!t) return '';
+  const s = Math.max(0, (now() - t) / 1000);
+  if (s < 10) return 'just now';
+  if (s < 90) return Math.round(s) + ' s ago';
+  if (s < 5400) return Math.round(s / 60) + ' min ago';
+  if (s < 129600) return Math.round(s / 3600) + ' h ago';
+  return Math.round(s / 86400) + ' days ago';
+}
+function clock(t) { return new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+
+/* ---------- trouble code meanings (generic SAE codes) ---------- */
+const DTC = {
+  P0010: 'Intake camshaft position actuator circuit (bank 1)', P0011: 'Intake camshaft timing over-advanced or system performance (bank 1)',
+  P0012: 'Intake camshaft timing over-retarded (bank 1)', P0013: 'Exhaust camshaft position actuator circuit (bank 1)',
+  P0014: 'Exhaust camshaft timing over-advanced or system performance (bank 1)', P0016: 'Crankshaft and camshaft position do not agree (bank 1, sensor A)',
+  P0017: 'Crankshaft and camshaft position do not agree (bank 1, sensor B)', P0020: 'Intake camshaft position actuator circuit (bank 2)',
+  P0021: 'Intake camshaft timing over-advanced or system performance (bank 2)', P0022: 'Intake camshaft timing over-retarded (bank 2)',
+  P0030: 'Oxygen sensor heater control circuit (bank 1, sensor 1)', P0031: 'Oxygen sensor heater control circuit low (bank 1, sensor 1)',
+  P0036: 'Oxygen sensor heater control circuit (bank 1, sensor 2)', P0037: 'Oxygen sensor heater control circuit low (bank 1, sensor 2)',
+  P0100: 'Mass air flow sensor circuit', P0101: 'Mass air flow sensor range or performance', P0102: 'Mass air flow sensor circuit low input',
+  P0103: 'Mass air flow sensor circuit high input', P0106: 'Manifold pressure sensor range or performance', P0107: 'Manifold pressure sensor circuit low input',
+  P0108: 'Manifold pressure sensor circuit high input', P0110: 'Intake air temperature sensor circuit', P0112: 'Intake air temperature sensor circuit low input',
+  P0113: 'Intake air temperature sensor circuit high input', P0115: 'Engine coolant temperature sensor circuit', P0116: 'Engine coolant temperature sensor range or performance',
+  P0117: 'Engine coolant temperature sensor circuit low input', P0118: 'Engine coolant temperature sensor circuit high input',
+  P0120: 'Throttle or pedal position sensor A circuit', P0121: 'Throttle or pedal position sensor A range or performance',
+  P0122: 'Throttle or pedal position sensor A circuit low input', P0123: 'Throttle or pedal position sensor A circuit high input',
+  P0125: 'Coolant temperature too low for closed-loop fuel control', P0128: 'Coolant thermostat: engine not reaching operating temperature',
+  P0171: 'Fuel system too lean (bank 1)', P0172: 'Fuel system too rich (bank 1)', P0174: 'Fuel system too lean (bank 2)', P0175: 'Fuel system too rich (bank 2)',
+  P0190: 'Fuel rail pressure sensor circuit', P0191: 'Fuel rail pressure sensor range or performance', P0200: 'Fuel injector circuit',
+  P0217: 'Engine coolant over temperature', P0218: 'Transmission fluid over temperature', P0219: 'Engine overspeed', P0230: 'Fuel pump primary circuit',
+  P0234: 'Turbocharger or supercharger overboost', P0299: 'Turbocharger or supercharger underboost', P0300: 'Random or multiple cylinder misfire detected',
+  P0325: 'Knock sensor 1 circuit (bank 1)', P0327: 'Knock sensor 1 circuit low input (bank 1)', P0328: 'Knock sensor 1 circuit high input (bank 1)',
+  P0335: 'Crankshaft position sensor A circuit', P0336: 'Crankshaft position sensor A range or performance',
+  P0340: 'Camshaft position sensor A circuit (bank 1)', P0341: 'Camshaft position sensor A range or performance (bank 1)',
+  P0400: 'Exhaust gas recirculation flow', P0401: 'Exhaust gas recirculation flow insufficient', P0402: 'Exhaust gas recirculation flow excessive',
+  P0403: 'Exhaust gas recirculation control circuit', P0404: 'Exhaust gas recirculation control range or performance',
+  P0410: 'Secondary air injection system', P0411: 'Secondary air injection system incorrect flow',
+  P0420: 'Catalyst system efficiency below threshold (bank 1)', P0421: 'Warm-up catalyst efficiency below threshold (bank 1)',
+  P0430: 'Catalyst system efficiency below threshold (bank 2)', P0440: 'Evaporative emission control system', P0441: 'Evaporative emission system incorrect purge flow',
+  P0442: 'Evaporative emission system small leak detected', P0443: 'Evaporative emission purge control valve circuit', P0446: 'Evaporative emission vent control circuit',
+  P0449: 'Evaporative emission vent valve or solenoid circuit', P0450: 'Evaporative emission pressure sensor', P0451: 'Evaporative emission pressure sensor range or performance',
+  P0452: 'Evaporative emission pressure sensor low input', P0453: 'Evaporative emission pressure sensor high input',
+  P0455: 'Evaporative emission system large leak detected', P0456: 'Evaporative emission system very small leak detected',
+  P0457: 'Evaporative emission system leak detected (fuel cap loose or off)', P0460: 'Fuel level sensor circuit', P0461: 'Fuel level sensor range or performance',
+  P0462: 'Fuel level sensor circuit low input', P0463: 'Fuel level sensor circuit high input', P0480: 'Cooling fan 1 control circuit', P0481: 'Cooling fan 2 control circuit',
+  P0496: 'Evaporative emission flow during a non-purge condition', P0500: 'Vehicle speed sensor', P0501: 'Vehicle speed sensor range or performance',
+  P0505: 'Idle control system', P0506: 'Idle speed lower than expected', P0507: 'Idle speed higher than expected',
+  P0520: 'Engine oil pressure sensor or switch circuit', P0521: 'Engine oil pressure sensor range or performance', P0522: 'Engine oil pressure sensor low voltage',
+  P0523: 'Engine oil pressure sensor high voltage', P0562: 'System voltage low', P0563: 'System voltage high',
+  P0600: 'Serial communication link', P0601: 'Control module memory checksum error', P0602: 'Control module programming error',
+  P0603: 'Control module keep-alive memory error', P0604: 'Control module RAM error', P0605: 'Control module ROM error', P0606: 'Control module processor fault',
+  P0620: 'Generator control circuit', P0627: 'Fuel pump A control circuit open', P0700: 'Transmission control system fault (light requested by transmission)',
+  P0705: 'Transmission range sensor circuit', P0715: 'Input or turbine speed sensor circuit', P0720: 'Output speed sensor circuit', P0730: 'Incorrect gear ratio',
+  P0731: 'Gear 1 incorrect ratio', P0732: 'Gear 2 incorrect ratio', P0733: 'Gear 3 incorrect ratio', P0734: 'Gear 4 incorrect ratio', P0735: 'Gear 5 incorrect ratio',
+  P0740: 'Torque converter clutch circuit', P0741: 'Torque converter clutch performance or stuck off', P0750: 'Shift solenoid A', P0755: 'Shift solenoid B',
+  P0A80: 'Replace hybrid battery pack', P2096: 'Post-catalyst fuel trim too lean (bank 1)', P2097: 'Post-catalyst fuel trim too rich (bank 1)',
+  P2101: 'Throttle actuator control motor range or performance', P2135: 'Throttle or pedal position sensors A and B do not agree',
+  P2138: 'Throttle or pedal position sensors D and E do not agree', P2187: 'Fuel system too lean at idle (bank 1)',
+  P2195: 'Oxygen sensor signal stuck lean (bank 1, sensor 1)', P2196: 'Oxygen sensor signal stuck rich (bank 1, sensor 1)',
+  P2270: 'Oxygen sensor signal stuck lean (bank 1, sensor 2)', P2271: 'Oxygen sensor signal stuck rich (bank 1, sensor 2)',
+  P2610: 'Control module engine-off timer performance', U0001: 'High-speed CAN communication bus', U0073: 'Control module communication bus A off',
+  U0100: 'Lost communication with the engine control module', U0101: 'Lost communication with the transmission control module',
+  U0121: 'Lost communication with the ABS control module', U0140: 'Lost communication with the body control module',
+  U0155: 'Lost communication with the instrument cluster'
+};
+(function families() {
+  const pad = n => 'P0' + String(n).padStart(3, '0');
+  for (let c = 1; c <= 12; c++) {
+    DTC[pad(300 + c)] = 'Cylinder ' + c + ' misfire detected';
+    DTC[pad(200 + c)] = 'Fuel injector circuit, cylinder ' + c;
+    DTC[pad(350 + c)] = 'Ignition coil ' + 'ABCDEFGHIJKL'[c - 1] + ' primary or secondary circuit';
+  }
+  const o2 = ['circuit', 'circuit low voltage', 'circuit high voltage', 'slow response', 'no activity detected', 'heater circuit'];
+  [[130, 'bank 1, sensor 1'], [136, 'bank 1, sensor 2'], [150, 'bank 2, sensor 1'], [156, 'bank 2, sensor 2']].forEach(([b, where]) =>
+    o2.forEach((what, i) => { DTC[pad(b + i)] = 'Oxygen sensor ' + what + ' (' + where + ')'; }));
+})();
+const AREA = { 0: 'fuel and air metering', 1: 'fuel and air metering', 2: 'fuel injector circuit', 3: 'ignition system or misfire', 4: 'emission controls',
+  5: 'vehicle speed, idle control and auxiliary inputs', 6: 'control module and output circuits', 7: 'transmission', 8: 'transmission', 9: 'transmission', A: 'hybrid propulsion', B: 'hybrid propulsion', C: 'hybrid propulsion' };
+function describe(code, given) {
+  const base = String(code).toUpperCase().split('-')[0];
+  if (given && given[code]) return given[code];
+  if (given && given[base]) return given[base];
+  if (DTC[base]) return DTC[base];
+  const sys = { P: 'Powertrain', C: 'Chassis', B: 'Body', U: 'Network' }[base[0]] || 'Unknown';
+  const own = base[1] === '1' || (base[0] === 'P' && base[1] === '3' && base[2] < '4') ? 'manufacturer-specific' : 'generic';
+  const area = base[0] === 'P' && AREA[base[2]] ? ', ' + AREA[base[2]] : '';
+  return sys + ' code, ' + own + area + '. Look it up for your make and model.';
+}
+function codeFromNumber(n) { // two bytes from OBD mode 02/03 into "P0420"
+  n = Math.round(n) & 0xFFFF; if (!n) return null;
+  return 'PCBU'[n >> 14] + ((n >> 12) & 3) + ((n >> 8) & 15).toString(16).toUpperCase() + ((n >> 4) & 15).toString(16).toUpperCase() + (n & 15).toString(16).toUpperCase();
+}
+
+/* ---------- state ---------- */
+let cfg = store.get('obdr.cfg', null);
+const blank = () => ({ readings: {}, battery: null, dtc: null, derived: null, events: [], adapter: null, lastSeen: 0, lastLive: 0, gps: null });
+let S = Object.assign(blank(), store.get('obdr.state', {}));
+let hist = {}, link = { state: 'idle', why: '' }, mq = null, demo = null, saveT = 0;
+const prefix = () => cfg.dev.includes('/') ? cfg.dev.replace(/\/+$/, '') : 'wican/' + cfg.dev;
+function save() { if (demo) return; clearTimeout(saveT); saveT = setTimeout(() => store.set('obdr.state', S), 800); }
+function plausible(sec) { const ms = sec * 1000; return ms > 1577836800000 && ms < now() + 86400000 ? ms : 0; }
+
+/* ---------- a small MQTT 3.1.1 client over WebSocket ---------- */
+const enc = new TextEncoder(), dec = new TextDecoder();
+const str = s => { const b = enc.encode(s); return [b.length >> 8, b.length & 255, ...b]; };
+function packet(type, body) {
+  let n = body.length; const len = [];
+  do { let d = n % 128; n = Math.floor(n / 128); if (n) d |= 128; len.push(d); } while (n);
+  return new Uint8Array([type, ...len, ...body]);
+}
+class Mqtt {
+  constructor(url, user, pass, handlers) { Object.assign(this, { url, user, pass, h: handlers, buf: new Uint8Array(0), tries: 0, dead: false, id: 1 }); this.open(); }
+  open() {
+    if (this.dead) return;
+    this.h.state('connecting', '');
+    let ws;
+    try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this.h.state('error', 'That address is not valid.'); return; }
+    this.ws = ws; ws.binaryType = 'arraybuffer'; this.ok = false;
+    ws.onopen = () => {
+      const flags = 2 | (this.user ? 128 : 0) | (this.pass ? 64 : 0);
+      const body = [...str('MQTT'), 4, flags, 0, 30, ...str('obdremote-' + Math.random().toString(16).slice(2, 10))];
+      if (this.user) body.push(...str(this.user));
+      if (this.pass) body.push(...str(this.pass));
+      ws.send(packet(0x10, body));
+    };
+    ws.onmessage = ev => { const a = new Uint8Array(ev.data), b = new Uint8Array(this.buf.length + a.length); b.set(this.buf); b.set(a, this.buf.length); this.buf = b; this.parse(); };
+    ws.onclose = () => {
+      clearInterval(this.ping); if (this.dead || this.ws !== ws) return;
+      if (this.fatal) return;
+      this.h.state('error', this.ok ? 'Connection lost. Trying again.' : 'Could not reach the message service. Check the address, then your internet connection.');
+      this.retry = setTimeout(() => this.open(), Math.min(30000, 2000 * 2 ** this.tries++));
+    };
+  }
+  parse() {
+    for (;;) {
+      const b = this.buf; if (b.length < 2) return;
+      let len = 0, mult = 1, i = 1, d;
+      do { if (i >= b.length) return; d = b[i++]; len += (d & 127) * mult; mult *= 128; } while (d & 128);
+      if (b.length < i + len) return;
+      const type = b[0] >> 4, body = b.subarray(i, i + len); this.buf = b.slice(i + len);
+      if (type === 2) {
+        if (body[1] === 0) { this.ok = true; this.tries = 0; this.h.state('connected', ''); this.h.ready(); this.ping = setInterval(() => this.send(new Uint8Array([0xC0, 0])), 20000); }
+        else { this.fatal = true; this.h.state('error', body[1] === 4 || body[1] === 5 ? 'The message service refused the user name or password.' : 'The message service refused the connection (code ' + body[1] + ').'); this.ws.close(); }
+      } else if (type === 3) {
+        const tl = (body[0] << 8) | body[1], topic = dec.decode(body.subarray(2, 2 + tl)), qos = (b[0] >> 1) & 3;
+        let at = 2 + tl; if (qos) { const pid = [body[at], body[at + 1]]; at += 2; if (qos === 1) this.send(new Uint8Array([0x40, 2, ...pid])); }
+        this.h.message(topic, dec.decode(body.subarray(at)), !!(b[0] & 1));
+      }
+    }
+  }
+  send(bytes) { if (this.ws && this.ws.readyState === 1) { this.ws.send(bytes); return true; } return false; }
+  subscribe(filter) { const id = this.id++; this.send(packet(0x82, [id >> 8, id & 255, ...str(filter), 0])); }
+  publish(topic, payload, retain) { return this.ok && this.send(packet(0x30 | (retain ? 1 : 0), [...str(topic), ...enc.encode(payload)])); }
+  close() { this.dead = true; clearTimeout(this.retry); clearInterval(this.ping); try { this.ws.close(); } catch (e) {} }
+}
+
+/* ---------- turning messages into state ---------- */
+function note(text, t) { S.events.unshift({ t: t || now(), text }); S.events = S.events.slice(0, 20); }
+function setBattery(v, t) { if (typeof v === 'number' && v > 3 && v < 40) S.battery = { v, t: t || 0 }; }
+function takeDtc(o, t) {
+  if (o && o.report) o = o.report;
+  if (typeof o === 'string') o = { stored: o.split(/[,\s]+/).filter(Boolean) };
+  if (!o || typeof o !== 'object' || o.valid === false) return;
+  const list = v => Array.isArray(v) ? v.map(String) : typeof v === 'string' ? v.split(/[,\s]+/).filter(Boolean) : null;
+  const d = { stored: list(o.stored) || list(o.codes), pending: list(o.pending) || [], permanent: list(o.permanent) || [], mil: o.mil == null ? null : !!o.mil,
+    count: typeof o.mil_count === 'number' ? o.mil_count : typeof o.stored === 'number' ? o.stored : null, desc: o.desc || null, t: plausible(o.ts) || t || 0, full: true };
+  if (!d.stored) { d.stored = []; d.full = d.count === null || d.count === 0; }
+  S.dtc = d;
+}
+function takeSnapshot(o, t, live) {
+  let any = false;
+  for (const k in o) {
+    const v = o[k]; if (typeof v !== 'number' || !isFinite(v) || k === 'timestamp' || k === 'ts') continue;
+    any = true; S.readings[k] = { v, t };
+    if (live && !HIDE.test(k)) { (hist[k] = hist[k] || []).push(v); if (hist[k].length > 60) hist[k].shift(); }
+  }
+  if (!any) return;
+  if ('MonitorStatus' in o) { const n = o.MonitorStatus; S.derived = { mil: Math.floor(n / 2147483648) % 2 === 1, count: Math.floor(n / 16777216) % 128, freeze: codeFromNumber(o.FreezeDTC || 0), t }; }
+  if (typeof o.gps_latitude === 'number' && typeof o.gps_longitude === 'number' && (o.gps_latitude || o.gps_longitude)) S.gps = { lat: o.gps_latitude, lon: o.gps_longitude, t };
+  if (live) S.lastLive = t;
+}
+function onMessage(topic, text, retained) {
+  const p = prefix(); if (topic !== p && !topic.startsWith(p + '/')) return;
+  const sub = topic.slice(p.length + 1); if (sub.startsWith('cmd')) return;
+  let o = null; try { o = JSON.parse(text); } catch (e) {}
+  const stamp = o && typeof o === 'object' ? plausible(o.timestamp || o.ts || 0) : 0;
+  const t = retained ? stamp : now();            // a retained message is old news: only trust its own timestamp
+  if (!retained) S.lastSeen = now(); else if (stamp > S.lastSeen) S.lastSeen = stamp;
+
+  if (sub === 'status') { if (o && o.status) S.adapter = o.status; }
+  else if (sub === 'dtc') takeDtc(o === null ? text : o, t);
+  else if (sub === 'battery' || sub === 'rsp') { if (o) setBattery(Number(o.battery_voltage != null ? o.battery_voltage : o.voltage), t); }
+  else if (sub === 'events') {
+    if (o && o.event && !retained) {
+      const e = String(o.event), v = typeof o.voltage === 'number' ? o.voltage.toFixed(1) + ' V' : '';
+      if (v) setBattery(o.voltage, t);
+      note(e.startsWith('battery') ? 'Battery ' + e.slice(8).replace(/_/g, ' ') + (v ? ' at ' + v : '') : e === 'sleep' ? 'Adapter going to sleep' + (v ? ' at ' + v : '')
+        : e === 'dtc' && o.code ? 'New trouble code ' + o.code : e.startsWith('motion') ? 'Motion ' + e.slice(7) : e === 'bump' ? 'Bump detected' : e.charAt(0).toUpperCase() + e.slice(1).replace(/_/g, ' '));
+    }
+  } else if (o && typeof o === 'object' && !Array.isArray(o) && !('frame' in o)) {
+    if (o.test && !retained) note('Test reading received. The message service works.');
+    takeSnapshot(o, t, !retained);
+  }
+  bump = !retained; save(); render();
+}
+let bump = false;
+
+/* ---------- drawing ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function spark(a) {
+  if (!a || a.length < 3) return '<svg aria-hidden="true"></svg>';
+  const lo = Math.min(...a), hi = Math.max(...a), span = hi - lo || 1;
+  const pts = a.map((v, i) => (i / (a.length - 1) * 100).toFixed(1) + ',' + (23 - (v - lo) / span * 20).toFixed(1)).join(' ');
+  return '<svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + pts + '"/></svg>';
+}
+function render() {
+  if (!cfg) return;
+  const liveAge = S.lastLive ? now() - S.lastLive : Infinity, live = link.state === 'connected' && liveAge < 20000;
+  $('carName').textContent = cfg.name || '';
+
+  // link line
+  const dot = $('dot'); let line;
+  if (link.state === 'error') line = link.why;
+  else if (link.state !== 'connected') line = 'Connecting to the message service';
+  else if (live) line = 'Live. Engine data is arriving.';
+  else if (S.adapter === 'online') line = 'Adapter online, no engine data. Ignition is probably off.';
+  else if (S.adapter === 'offline') line = 'Adapter asleep or out of range' + (S.lastSeen ? ', last heard ' + ago(S.lastSeen) : '') + '.';
+  else line = S.lastSeen ? 'No word from the adapter since ' + clock(S.lastSeen) + '.' : 'Connected. Waiting for the adapter to check in.';
+  $('linkText').textContent = line;
+  dot.className = 'dot' + (link.state === 'error' ? ' err' : live ? ' live' : '');
+  if (bump && live) { dot.classList.remove('tick'); void dot.offsetWidth; dot.classList.add('tick'); } bump = false;
+
+  // telltale and codes
+  const d = S.dtc, g = S.derived, tell = $('tell'); let head, sub = '', lamp = '', rows = [], codesNote = '';
+  const use = d && (!g || !g.t || d.t >= g.t || d.full) ? d : null;
+  if (use) {
+    const n = use.stored.length + use.permanent.length, on = use.mil === true || (use.mil === null && n > 0);
+    use.stored.forEach(c => rows.push([c, 'Stored']));
+    use.pending.forEach(c => rows.push([c, 'Pending']));
+    use.permanent.forEach(c => rows.push([c, 'Permanent']));
+    const shown = use.full ? n : use.count || 0;
+    if (on) { head = 'Check engine light is on'; lamp = 'on'; sub = shown + (shown === 1 ? ' code' : ' codes') + ' stored'; }
+    else if (shown || use.pending.length) { head = shown ? shown + (shown === 1 ? ' trouble code stored' : ' trouble codes stored') : 'No stored codes'; sub = use.pending.length ? use.pending.length + ' pending, light is off' : 'Light is off'; }
+    else { head = 'No trouble codes'; lamp = 'clear'; sub = 'Check engine light is off'; }
+    if (!use.full) codesNote = 'The adapter sent a count without the list of codes.';
+    if (use.t) sub += ', scanned ' + ago(use.t);
+  } else if (g) {
+    if (g.mil || g.count) { head = g.mil ? 'Check engine light is on' : g.count + ' trouble code' + (g.count === 1 ? '' : 's') + ' stored'; lamp = g.mil ? 'on' : ''; sub = g.count + (g.count === 1 ? ' code' : ' codes') + ' stored';
+      if (g.freeze) rows.push([g.freeze, 'Freeze frame']);
+      codesNote = 'The adapter sent the light, the count and the freeze-frame code, but not the full list.'; }
+    else { head = 'No trouble codes'; lamp = 'clear'; sub = 'Check engine light is off'; }
+    if (g.t) sub += ', read ' + ago(g.t);
+  } else { head = S.lastSeen ? 'No code scan yet' : 'Waiting for the first reading'; sub = S.lastSeen ? 'Codes appear after the adapter scans with the ignition on.' : 'Readings appear here the next time the car is running and online.'; }
+  tell.className = 'tell ' + lamp; $('tellHead').textContent = head; $('tellSub').textContent = sub;
+  $('secCodes').hidden = !rows.length && !codesNote;
+  $('codeList').hidden = !rows.length;
+  $('codeList').innerHTML = rows.map(([c, kind]) => '<li><span class="code">' + esc(c) + '</span><span class="kind">' + kind + '</span><span class="desc">' + esc(describe(c, use && use.desc)) +
+    ' <a href="https://www.google.com/search?q=' + encodeURIComponent(c + ' OBD code meaning') + '" target="_blank" rel="noopener">Look it up</a></span></li>').join('');
+  $('codesNote').textContent = codesNote; $('codesNote').hidden = !codesNote;
+
+  // tiles
+  const R = Object.assign({}, S.readings);
+  if (S.battery && (!R.ControlModuleVolt || !live)) R.ControlModuleVolt = { v: S.battery.v, t: S.battery.t };
+  const tiles = TILES.filter(k => R[k]);
+  $('secTiles').hidden = !tiles.length;
+  $('tiles').innerHTML = tiles.map(k => {
+    const r = R[k], [txt, unit] = show(k, r.v), stale = !live || !r.t || now() - r.t > 30000;
+    const warn = k === 'ControlModuleVolt' && r.v < 11.9;
+    return '<div class="tile' + (stale ? ' stale' : '') + (warn ? ' warn' : '') + '"><div class="name">' + esc(label(k)) + '</div><div class="val">' + txt + '<span>' + unit + '</span></div>' +
+      (stale ? '<div class="age">' + (r.t ? ago(r.t) : 'last known') + (warn ? ', low' : '') + '</div>' : spark(hist[k])) + '</div>';
+  }).join('');
+  $('tilesAge').textContent = live ? 'updating live' : S.lastLive ? 'as of ' + clock(S.lastLive) : '';
+
+  // location, everything else, events
+  $('secWhere').hidden = !S.gps;
+  if (S.gps) { $('whereLink').href = 'https://www.google.com/maps?q=' + S.gps.lat + ',' + S.gps.lon; $('whereAge').textContent = S.gps.t ? ago(S.gps.t) : ''; }
+  const rest = Object.keys(S.readings).filter(k => !HIDE.test(k) && !TILES.includes(k)).sort((a, b) => label(a).localeCompare(label(b)));
+  $('secAll').hidden = !rest.length; $('allSum').textContent = 'All other readings (' + rest.length + ')';
+  $('allBody').innerHTML = rest.map(k => { const [txt, unit] = show(k, S.readings[k].v); return '<tr><td>' + esc(label(k)) + '</td><td>' + txt + '</td><td>' + esc(unit) + '</td></tr>'; }).join('');
+  $('secEvents').hidden = !S.events.length;
+  $('eventList').innerHTML = S.events.map(e => '<li><span>' + esc(e.text) + '</span><time>' + clock(e.t) + '</time></li>').join('');
+  $('btnCheck').disabled = link.state !== 'connected' && !demo;
+}
+
+/* ---------- connect, demo, settings ---------- */
+function wsUrl() {
+  const h = cfg.host.trim(); if (/^wss?:\/\//i.test(h)) return h;
+  const pp = (cfg.port || '8084/mqtt').replace(/^[:/]+/, ''), i = pp.indexOf('/');
+  return 'wss://' + h.replace(/^\w+:\/\//, '').replace(/[/:].*$/, '') + ':' + (i < 0 ? pp : pp.slice(0, i)) + (i < 0 ? '/mqtt' : pp.slice(i));
+}
+function connect() {
+  if (mq) mq.close(); mq = null; stopDemo();
+  $('setup').hidden = true; $('dash').hidden = false; $('btnSettings').hidden = false; $('demoBar').hidden = true;
+  $('foot').textContent = 'Readings come from ' + prefix() + ' on ' + cfg.host.replace(/^\w+:\/\//, '').replace(/[/:].*$/, '') + '.';
+  mq = new Mqtt(wsUrl(), cfg.user, cfg.pass, {
+    state(s, why) { link = { state: s, why }; render(); },
+    ready() { mq.subscribe(prefix() + '/#'); },
+    message: onMessage
+  });
+  render();
+}
+function openSetup(editing) {
+  $('dash').hidden = true; $('setup').hidden = false; $('btnSettings').hidden = true;
+  $('setupTitle').textContent = editing ? 'Settings' : 'Connect to your car';
+  $('btnCancel').hidden = !editing; $('setupExtra').hidden = !editing; $('btnDemo').hidden = editing; $('testNote').hidden = true; $('setupErr').hidden = true;
+  const c = cfg && !cfg.demo ? cfg : {};
+  $('fName').value = c.name || ''; $('fHost').value = c.host || ''; $('fUser').value = c.user || ''; $('fPass').value = c.pass || '';
+  $('fDev').value = c.dev || ''; $('fPort').value = c.port || ''; $('fUnits').value = c.units || (/^en-US/i.test(navigator.language || '') ? 'us' : 'metric');
+}
+$('setup').addEventListener('submit', e => {
+  e.preventDefault();
+  const raw = $('fDev').value.trim(), host = $('fHost').value.trim();
+  const dev = raw.includes('/') ? raw : raw.replace(/^WiCAN_/i, '').toLowerCase();   // a value with a slash is a full topic prefix
+  if (!host || !dev) { $('setupErr').textContent = 'The message service address and the car topic are both needed.'; $('setupErr').hidden = false; return; }
+  const changed = !cfg || cfg.demo || cfg.dev !== dev || cfg.host !== host;
+  cfg = { name: $('fName').value.trim(), host, user: $('fUser').value.trim(), pass: $('fPass').value, dev, port: $('fPort').value.trim(), units: $('fUnits').value };
+  store.set('obdr.cfg', cfg); if (changed) { S = blank(); hist = {}; store.del('obdr.state'); }
+  connect();
+});
+$('btnSettings').onclick = () => { if (demo) return; openSetup(true); };
+$('btnCancel').onclick = () => { $('setup').hidden = true; $('dash').hidden = false; $('btnSettings').hidden = false; };
+$('btnForget').onclick = () => { if (mq) mq.close(); mq = null; cfg = null; S = blank(); store.del('obdr.cfg'); store.del('obdr.state'); openSetup(false); };
+$('btnTest').onclick = () => {
+  const ok = mq && mq.publish(prefix() + '/autopid', JSON.stringify({ EngineRPM: 800, VehicleSpeed: 0, EngineCoolantTemp: 88, ControlModuleVolt: 14.1, timestamp: Math.floor(now() / 1000), test: 1 }), false);
+  $('testNote').hidden = false;
+  $('testNote').textContent = ok ? 'Sent. Go back to the dashboard: a "Test reading received" line under Recent events means the round trip works.' : 'Not connected to the message service yet, so nothing was sent.';
+};
+$('btnCheck').onclick = () => {
+  if (demo) { $('checkNote').textContent = 'In the demo this button does nothing.'; return; }
+  const a = mq && mq.publish(prefix() + '/cmd/scan', '1', false), b = mq && mq.publish(prefix() + '/cmd', '{"cmd":"get_vbatt"}', false);
+  $('checkNote').textContent = a || b ? 'Asked at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '. The adapter can only answer while it is awake.' : 'Not connected, so nothing was sent.';
+};
+
+function startDemo() {
+  if (mq) mq.close(); mq = null;
+  cfg = { demo: true, name: 'demo car', dev: 'demo', host: 'demo', units: /^en-US/i.test(navigator.language || '') ? 'us' : 'metric' };
+  S = blank(); hist = {}; link = { state: 'connected', why: '' };
+  $('setup').hidden = true; $('dash').hidden = false; $('btnSettings').hidden = true; $('demoBar').hidden = false; $('foot').textContent = '';
+  let k = 0, parked = false, fault = false, odo = 84210.4;
+  const feed = (sub, o) => onMessage('wican/demo/' + sub, JSON.stringify(o), false);
+  const scan = () => feed('dtc', fault ? { valid: true, mil: true, mil_count: 2, stored: ['P0420', 'P0171'], pending: ['P0302'], permanent: [], ts: Math.floor(now() / 1000) }
+    : { valid: true, mil: false, mil_count: 0, stored: [], pending: [], permanent: [], ts: Math.floor(now() / 1000) });
+  const tick = () => {
+    if (parked) return; k++;
+    const sp = Math.max(0, 52 + 38 * Math.sin(k / 9) + 10 * Math.sin(k / 2.3)); odo += sp / 1800;
+    feed('autopid', { EngineRPM: Math.round(780 + sp * 24 + 60 * Math.sin(k)), VehicleSpeed: Math.round(sp), EngineCoolantTemp: Math.min(92, 60 + k), CalcEngineLoad: Math.round(18 + sp / 3),
+      FuelTankLevel: Math.max(5, 62 - k / 40), ControlModuleVolt: 14.1 + 0.1 * Math.sin(k / 4), IntakeAirTemperature: 24, ThrottlePosition: Math.round(12 + sp / 4), AmbientAirTemp: 9, Odometer: odo,
+      gps_latitude: 40.7128, gps_longitude: -74.006, timestamp: Math.floor(now() / 1000) });
+  };
+  feed('status', { status: 'online' }); scan(); tick();
+  demo = { t: setInterval(tick, 2000) };
+  $('demoFault').onclick = () => { fault = !fault; $('demoFault').textContent = fault ? 'Clear the fault' : 'Simulate a fault'; if (fault) feed('events', { event: 'dtc', code: 'P0420' }); scan(); };
+  $('demoPark').onclick = () => {
+    parked = !parked; $('demoPark').textContent = parked ? 'Start the car' : 'Park the car';
+    if (parked) { feed('autopid', { EngineRPM: 0, VehicleSpeed: 0, CalcEngineLoad: 0, ThrottlePosition: 0, timestamp: Math.floor(now() / 1000) }); feed('events', { event: 'sleep', voltage: 12.5 }); feed('battery', { battery_voltage: 12.5, ts: Math.floor(now() / 1000) }); feed('status', { status: 'offline' }); S.lastLive = now() - 21000; render(); }
+    else { feed('status', { status: 'online' }); tick(); }
+  };
+}
+function stopDemo() { if (demo) { clearInterval(demo.t); demo = null; } }
+$('btnDemo').onclick = startDemo;
+$('demoExit').onclick = () => { stopDemo(); cfg = store.get('obdr.cfg', null); S = Object.assign(blank(), store.get('obdr.state', {})); hist = {}; if (cfg) connect(); else openSetup(false); };
+
+setInterval(render, 5000);
+// Phones pause background pages: when the page comes back and the socket has died, reconnect at once.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && mq && !mq.fatal && mq.ws && mq.ws.readyState === 3) { clearTimeout(mq.retry); mq.tries = 0; mq.open(); } });
+if (location.hash === '#demo') startDemo(); else if (cfg) connect(); else openSetup(false);
+})();
+</script>
+</body>
+</html>
